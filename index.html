@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angel Walking Tracker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🐕 ANGEL WALKING TRACKER</h1>
+        </div>
+        
+        <div class="dog-image-section">
+            <img id="dogImage" class="dog-image" src="angel-image.jpg" alt="Angel">
+        </div>
+        
+        <div class="streak-section">
+            <div class="streak-number" id="streakNumber">0</div>
+            <div class="streak-text">streak: <span id="streakCount">0</span> 🔥</div>
+        </div>
+        
+        <div class="heatmap-section">
+            <div class="heatmap-title">Calendar Heatmap</div>
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">← Prev</button>
+                <span id="currentMonth"></span>
+                <button onclick="changeMonth(1)">Next →</button>
+            </div>
+            <div class="heatmap" id="heatmap"></div>
+            <button class="log-btn" onclick="openLogModal()">LOG WALK</button>
+        </div>
+    </div>
+    
+    <!-- Log Walk Modal -->
+    <div id="logModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeLogModal()">&times;</span>
+            <h2 class="modal-title">🚶‍♀️ Log Walk</h2>
+            <form onsubmit="logWalk(event)">
+                <div class="form-group">
+                    <label for="walkDate">Date:</label>
+                    <input type="date" id="walkDate" required>
+                </div>
+                <div class="form-group">
+                    <label for="walkNotes">Notes (optional):</label>
+                    <textarea id="walkNotes" rows="3" placeholder="How was Angel's walk today?"></textarea>
+                </div>
+                <button type="submit" class="modal-log-btn">LOG WALK</button>
+            </form>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
