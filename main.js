@@ -20,15 +20,13 @@ function initSupabase() {
 // Supabase Functions
 async function saveWalkToSupabase(walkData) {
     try {
-        const userId = await getUserId();
         const { data, error } = await supabase
             .from('walks')
             .upsert({
-                user_id: userId,
                 date: walkData.date,
                 notes: walkData.notes || null
             }, {
-                onConflict: 'user_id,date'
+                onConflict: 'date'
             })
             .select();
         
@@ -42,11 +40,9 @@ async function saveWalkToSupabase(walkData) {
 
 async function loadWalksFromSupabase() {
     try {
-        const userId = await getUserId();
         const { data, error } = await supabase
             .from('walks')
             .select('*')
-            .eq('user_id', userId)
             .order('date', { ascending: false });
         
         if (error) throw error;
@@ -60,21 +56,6 @@ async function loadWalksFromSupabase() {
         console.error('Error loading walks:', error);
         return [];
     }
-}
-        
-async function getUserId() {
-    // Simple user identification for your 3-user scenario
-    let userId = localStorage.getItem('supabase_user_id');
-    if (!userId) {
-        // You could make this more user-friendly with a simple name input
-        userId = prompt('Enter your name (this identifies your data):') || 'user_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('supabase_user_id', userId);
-    }
-    
-    // Display current user in header
-    document.getElementById('userInfo').textContent = `User: ${userId}`;
-    
-    return userId;
 }
 
 // Set up real-time subscriptions for live sync
