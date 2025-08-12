@@ -2,6 +2,7 @@ const SUPABASE_CONFIG = {
     url: 'https://vsiroplehniaprtecqma.supabase.co', // Your actual project URL
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzaXJvcGxlaG5pYXBydGVjcW1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NjkwOTMsImV4cCI6MjA3MDU0NTA5M30.x5ksWXA53d9It1q_hQVRER_1QqzjZYpbD5O-Z2ZyYqw' // Your actual anon key
 };
+
 let supabase;
 let walks = JSON.parse(localStorage.getItem('angelWalks')) || [];
 let currentDate = new Date();
@@ -219,16 +220,60 @@ function updateHeatmap() {
         const cell = document.createElement('div');
         cell.className = 'heatmap-cell';
         
-        const dateStr = formatDate(new Date(year, month, day));
-        const hasWalk = walks.some(walk => walk.date === dateStr);
+        const dateObj = new Date(year, month, day);
+        const dateStr = formatDate(dateObj);
+        const walk = walks.find(walk => walk.date === dateStr);
+        const hasWalk = !!walk;
         
         if (hasWalk) {
             cell.className += ' has-walk level-3';
         }
         
         cell.title = `${dateStr}${hasWalk ? ' - Walk logged!' : ''}`;
+        cell.dataset.date = dateStr;
+
+        // Add click event to open modal with notes
+        cell.addEventListener('click', function() {
+            openDayModal(dateStr, walk ? walk.notes : '');
+        });
+
         heatmap.appendChild(cell);
     }
+}
+
+// Modal for viewing walk details
+function openDayModal(date, notes) {
+    // Create modal if it doesn't exist
+    let dayModal = document.getElementById('dayModal');
+    if (!dayModal) {
+        dayModal = document.createElement('div');
+        dayModal.id = 'dayModal';
+        dayModal.className = 'modal';
+        dayModal.innerHTML = `
+            <div class="modal-content">
+                <span class="close" id="closeDayModal">&times;</span>
+                <div class="modal-title" id="dayModalTitle"></div>
+                <div class="modal-notes" id="dayModalNotes"></div>
+            </div>
+        `;
+        document.body.appendChild(dayModal);
+
+        // Close modal on X click
+        document.getElementById('closeDayModal').onclick = function() {
+            dayModal.style.display = 'none';
+        };
+
+        // Close modal when clicking outside
+        dayModal.onclick = function(event) {
+            if (event.target === dayModal) {
+                dayModal.style.display = 'none';
+            }
+        };
+    }
+
+    document.getElementById('dayModalTitle').textContent = `Date: ${date}`;
+    document.getElementById('dayModalNotes').textContent = notes ? `Notes: ${notes}` : 'No notes for this day.';
+    dayModal.style.display = 'block';
 }
 
 function changeMonth(direction) {
