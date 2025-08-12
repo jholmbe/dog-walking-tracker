@@ -2,17 +2,110 @@ const SUPABASE_CONFIG = {
     url: 'https://vsiroplehniaprtecqma.supabase.co', // Your actual project URL
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZzaXJvcGxlaG5pYXBydGVjcW1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5NjkwOTMsImV4cCI6MjA3MDU0NTA5M30.x5ksWXA53d9It1q_hQVRER_1QqzjZYpbD5O-Z2ZyYqw' // Your actual anon key
 };
-
+let supabase;
 let walks = JSON.parse(localStorage.getItem('angelWalks')) || [];
 let currentDate = new Date();
 let viewMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
 
-// Initialize app
-document.addEventListener('DOMContentLoaded', function() {
-    // Set default date to today
-    document.getElementById('walkDate').value = formatDate(currentDate);
+// Initialize Supabase
+function initSupabase() {
+    if (!window.supabase) {
+        throw new Error('Supabase not loaded');
+    }
     
-    // Update displays
+    supabase = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+    return supabase;
+}
+
+// Supabase Functions
+async function saveWalkToSupabase(walkData) {
+    try {
+        const userId = await getUserId();
+        const { data, error } = await supabase
+            .from('walks')
+            .upsert({
+                user_id: userId,
+                date: walkData.date,
+                notes: walkData.notes || null
+            }, {
+                onConflict: 'user_id,date'
+            })
+            .select();
+        
+        if (error) throw error;
+        return data[0];
+    } catch (error) {
+        console.error('Error saving walk:', error);
+        throw error;
+    }
+}
+
+async function loadWalksFromSupabase() {
+    try {
+        const userId = await getUserId();
+        const { data, error } = await supabase
+            .from('walks')
+            .select('*')
+            .eq('user_id', userId)
+            .order('date', { ascending: false });
+        
+        if (error) throw error;
+        
+        return data.map(record => ({
+            date: record.date,
+            notes: record.notes || '',
+            id: record.id
+        }));
+    } catch (error) {
+        console.error('Error loading walks:', error);
+        return [];
+    }
+}
+        
+async function getUserId() {
+    // Simple user identification for your 3-user scenario
+    let userId = localStorage.getItem('supabase_user_id');
+    if (!userId) {
+        // You could make this more user-friendly with a simple name input
+        userId = prompt('Enter your name (this identifies your data):') || 'user_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('supabase_user_id', userId);
+    }
+    
+    // Display current user in header
+    document.getElementById('userInfo').textContent = `User: ${userId}`;
+    
+    return userId;
+}
+
+// Set up real-time subscriptions for live sync
+function setupRealtimeSync() {
+    if (!supabase) return;
+    
+    const subscription = supabase
+        .channel('walks_changes')
+        .on('postgres_changes', 
+            { 
+                event: '*', 
+                schema: 'public', 
+                table: 'walks' 
+            }, 
+            async (payload) => {
+                console.log('Real-time update:', payload);
+                // Reload walks when data changes
+                walks = await loadWalksFromSupabase();
+                updateStreak();
+                updateHeatmap();
+            }
+        )
+        .subscribe();
+    
+    return subscription;
+}
+// Initialize app
+document.addEventListener('DOMContentLoaded', async function() {
+    initSupabase();
+    walks = await loadWalksFromSupabase(); // <-- Load from Supabase
+    document.getElementById('walkDate').value = formatDate(currentDate);
     updateStreak();
     updateHeatmap();
 });
@@ -21,7 +114,7 @@ function formatDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-function logWalk(event) {
+async function logWalk(event) {
     event.preventDefault();
     
     const walkDate = document.getElementById('walkDate').value;
@@ -49,6 +142,16 @@ function logWalk(event) {
     // Save to localStorage
     localStorage.setItem('angelWalks', JSON.stringify(walks));
     
+    // Save to Supabase
+    try {
+        await saveWalkToSupabase({
+            date: walkDate,
+            notes: walkNotes
+        });
+    } catch (e) {
+        alert('Failed to save walk to Supabase!');
+    }
+
     // Update displays
     updateStreak();
     updateHeatmap();
