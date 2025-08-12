@@ -170,35 +170,44 @@ window.onclick = function(event) {
     }
 }
 
+const streakNumberEl = document.getElementById('streakNumber');
+const streakCountEl = document.getElementById('streakCount');
+const heatmapEl = document.getElementById('heatmap');
+
 function updateStreak() {
-    let streak = 0;
-    const today = new Date();
-    let checkDate = new Date(today);
-    
-    // Check consecutive days backwards from today
-    while (true) {
-        const dateStr = formatDate(checkDate);
-        const hasWalk = walks.some(walk => walk.date === dateStr);
-        
-        if (hasWalk) {
+    if (!walks.length) {
+        streakNumberEl.textContent = 0;
+        streakCountEl.textContent = 0;
+        return;
+    }
+
+    // Sort walks by date descending
+    const sortedWalks = [...walks].sort((a, b) => new Date(b.date) - new Date(a.date));
+    let streak = 1;
+    let lastDate = new Date(sortedWalks[0].date);
+
+    for (let i = 1; i < sortedWalks.length; i++) {
+        const currentDate = new Date(sortedWalks[i].date);
+        const diff = (lastDate - currentDate) / (1000 * 60 * 60 * 24);
+
+        if (diff === 1) {
             streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-        } else {
+            lastDate = currentDate;
+        } else if (diff > 1) {
             break;
         }
     }
-    
-    document.getElementById('streakNumber').textContent = streak;
-    document.getElementById('streakCount').textContent = streak;
+
+    streakNumberEl.textContent = streak;
+    streakCountEl.textContent = streak;
 }
 
 function updateHeatmap() {
-    const heatmap = document.getElementById('heatmap');
     const monthName = viewMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
     document.getElementById('currentMonth').textContent = monthName;
     
     // Clear heatmap
-    heatmap.innerHTML = '';
+    heatmapEl.innerHTML = '';
     
     // Get days in month
     const year = viewMonth.getFullYear();
@@ -212,7 +221,7 @@ function updateHeatmap() {
     for (let i = 0; i < startDayOfWeek; i++) {
         const cell = document.createElement('div');
         cell.className = 'heatmap-cell';
-        heatmap.appendChild(cell);
+        heatmapEl.appendChild(cell);
     }
     
     // Add cells for each day of the month
@@ -237,8 +246,29 @@ function updateHeatmap() {
             openDayModal(dateStr, walk ? walk.notes : '');
         });
 
-        heatmap.appendChild(cell);
+        heatmapEl.appendChild(cell);
     }
+}
+
+async function removeWalk(date) {
+    // Remove from local array
+    walks = walks.filter(walk => walk.date !== date);
+    // Update localStorage
+    localStorage.setItem('angelWalks', JSON.stringify(walks));
+    // Remove from Supabase
+    try {
+        const { error } = await supabase
+            .from('walks')
+            .delete()
+            .eq('date', date);
+        if (error) throw error;
+    } catch (e) {
+        alert('Failed to remove walk from Supabase!');
+    }
+    // Update UI
+    walks = await loadWalksFromSupabase();
+    updateStreak();
+    updateHeatmap();
 }
 
 // Modal for viewing walk details
@@ -254,6 +284,9 @@ function openDayModal(date, notes) {
                 <span class="close" id="closeDayModal">&times;</span>
                 <div class="modal-title" id="dayModalTitle"></div>
                 <div class="modal-notes" id="dayModalNotes"></div>
+                <div style="display:flex; justify-content:center;">
+                    <button id="removeWalkBtn" class="remove-walk-btn" style="display:none;">Remove Walk</button>
+                </div>
             </div>
         `;
         document.body.appendChild(dayModal);
@@ -273,6 +306,21 @@ function openDayModal(date, notes) {
 
     document.getElementById('dayModalTitle').textContent = `Date: ${date}`;
     document.getElementById('dayModalNotes').textContent = notes ? `Notes: ${notes}` : 'No notes for this day.';
+
+    // Show or hide the remove button
+    const removeBtn = document.getElementById('removeWalkBtn');
+    const walkExists = walks.some(walk => walk.date === date);
+    if (walkExists) {
+        removeBtn.style.display = 'inline-block';
+        removeBtn.onclick = async function() {
+            await removeWalk(date);
+            dayModal.style.display = 'none';
+        };
+    } else {
+        removeBtn.style.display = 'none';
+        removeBtn.onclick = null;
+    }
+
     dayModal.style.display = 'block';
 }
 
@@ -289,3 +337,13 @@ function displayDogImage(imageData) {
     dogImage.style.display = 'block';
     placeholder.style.display = 'none';
 }
+
+function debounce(fn, delay) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+    };
+}
+const debouncedUpdateHeatmap = debounce(updateHeatmap, 100);
+const debouncedUpdateStreak = debounce(updateStreak, 100);

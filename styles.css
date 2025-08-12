@@ -145,6 +145,19 @@ body {
     font-size: 22px;
     cursor: pointer;
 }
+.remove-walk-btn {
+    margin-top: 10px;
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.remove-walk-btn:active {
+    background: #c0392b;
+}
 @keyframes modalSlideIn {
     from {
         transform: translateY(-50px);
